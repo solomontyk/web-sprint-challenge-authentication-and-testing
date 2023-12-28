@@ -1,40 +1,58 @@
 const router = require('express').Router();
-const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
-const { checkMissing, checkUsernameFree, checkSpaces, checkUsernameExists } = require("./auth-middleware")
-const User = require('../users/users-model')
+const bcrypt = require('bcryptjs');
+const Users = require('../users/users-model');
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'thisIsTheSecret';
+const { checkUsernameAvailable } = require('./auth-middleware');
 
-router.post('/register', checkMissing, checkSpaces, checkUsernameFree, (req, res, next) => {
-  const { username, password } = req.body
-  const hash = bcrypt.hashSync(password, 8)
-  User.add({ username: username, password: hash })
-    .then(created => {
-      res.status(201).json(created)
-    })
-    .catch(next)
-});
+router.post('/register', checkUsernameAvailable, (req, res, next) => {
+  if (req.body.username && req.body.password) {
+    let user = req.body;
+    const rounds = process.env.BCRYPT_ROUNDS || 8;
+    const hash = bcrypt.hashSync(user.password, rounds);
+    user.password = hash;
 
-router.post('/login', checkMissing, checkUsernameExists, (req, res, next) => {
-  if (bcrypt.compareSync(req.body.password, req.user.password)) {
-    const token = generateToken(req.user)
-    res.status(200).json({
-      message: `welcome, ${req.user.username}`,
-      token: token,
-    })
+    Users.add(user)
+      .then((saved) => {
+        res.status(201).json(saved);
+      })
+      .catch(next);
   } else {
-    next({ status: 401, message: "invalid credentials" })
+    res.status(400).json({ message: 'Username and Password Required' });
   }
 });
 
-function generateToken(user) {
-  const secret = process.env.SECRET || "shh"
-  const output = {
-    subject: user.user_id,
-    username: user.username,
+router.post('/login', (req, res, next) => {
+  if (req.body.username && req.body.password) {
+    let { username, password } = req.body;
+
+    Users.findBy({ username })
+      .then(([user]) => {
+        if (user && bcrypt.compareSync(password, user.password)) {
+          const token = buildToken(user);
+          res.status(200).json({
+            message: `${user.username} is back`,
+            token,
+          });
+        } else {
+          next({ status: 401, message: 'Invalid Credentials' });
+        }
+      })
+      .catch(next);
+  } else {
+    res.status(400).json({ message: 'Username and Password Required' });
   }
+});
+
+function buildToken(user) {
+  const payload = {
+    subject: user.id,
+    username: user.username,
+  };
   const options = {
     expiresIn: '1d',
-  }
-  return jwt.sign(output, secret, options)
+  };
+  return jwt.sign(payload, JWT_SECRET, options);
 }
+
 module.exports = router;

@@ -1,60 +1,34 @@
-const User = require('../users/users-model')
+const Auth = require('../users/users-model');
 
-function checkMissing(req, res, next) {
-    if (!req.body.username ||
-        req.body.username.trim().length === 0 ||
-        !req.body.password ||
-        req.body.password.trim().length === 0
-        ) {
-            next({ status: 422, message: "username and password required" })
-        } else {
-            next()
-        }
-}
-
-function checkSpaces(req, res, next) {
-    const { username, password } = req.body
-    const cleanUsername = req.body.username.trim()
-    const cleanPassword = req.body.password.trim()
-    if (username.length !== cleanUsername.length ||
-        password.length !== cleanPassword.length
-        ) {
-            next({ status: 422, message: "fields can't include spaces" })
-        } else {
-            next()
-        }
-}
-
-async function checkUsernameFree(req, res, next) {
-    try {
-        const users = await User.findBy({ username: req.body.username })
-        if (!users.length) {
-            next()
-        } else {
-            next({ status: 400, message: "username taken" })
-        }
-    } catch (err) {
-        next(err)
+const checkUsernameAvailable = async (req, res, next) => {
+  if (!req.body.username || !req.body.password) {
+    next();
+  } else {
+    const { username } = req.body;
+    const userExists = await Auth.findBy({ username });
+    if (userExists.length > 0) {
+      res.status(401).json({ message: 'username taken' });
+    } else {
+      next();
     }
-}
+  }
+};
 
-async function checkUsernameExists(req, res, next) {
-    try {
-        const users = await User.findBy({ username: req.body.username })
-        if (users.length) {
-            req.user = users[0]
-            next()
-        } else {
-            next({ status: 401, message: "invalid credentials" })
-        }
-    } catch (err) {
-        next(err)
+const checkUsernameExists = async (req, res, next) => {
+  if (!req.body.username || !req.body.password) {
+    next();
+  } else {
+    const { username } = req.body;
+    const userExists = await Auth.findBy({ username });
+    if (!userExists) {
+      res.status(401).json({ message: 'invalid credentials' });
+    } else {
+      next();
     }
-}
+  }
+};
 
 module.exports = {
-    checkMissing,
-    checkSpaces,
-    checkUsernameFree,
-    checkUsernameExists,
-}
+  checkUsernameAvailable,
+  checkUsernameExists,
+};
