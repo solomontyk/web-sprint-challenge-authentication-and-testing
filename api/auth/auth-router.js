@@ -14,7 +14,8 @@ router.post('/register', checkUsernameAvailable, (req, res, next) => {
 
     Users.add(user)
       .then((saved) => {
-        res.status(201).json(saved);
+        const userWithHashedPassword = { ...saved, password: hash };
+        res.status(201).json(userWithHashedPassword);
       })
       .catch(next);
   } else {

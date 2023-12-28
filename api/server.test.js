@@ -5,6 +5,7 @@ const Jokes = require('./jokes/jokes-data');
 
 const user1 = { username: 'admin1', password: 'password' };
 
+
 beforeAll(async () => {
   await db.migrate.rollback();
   await db.migrate.latest();
